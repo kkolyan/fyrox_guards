@@ -20,11 +20,6 @@ use std::ops::Add;
 #[type_uuid(id = "12371d19-9f1a-4286-8486-add4ebaadaec")]
 #[visit(optional)]
 pub struct Bullet {
-    pub params: BulletParams,
-}
-
-#[derive(Visit, Reflect, Debug, Clone, Default)]
-pub struct BulletParams {
     pub velocity: Vector3<f32>,
     pub remaining_sec: f32,
     pub author_collider: Handle<Node>,
@@ -44,12 +39,12 @@ impl Bullet {
         let orientation = UnitQuaternion::face_towards(&seed.direction, &Vector3::y_axis());
         let bullet = seed.prefab.instantiate_at(scene, seed.origin, orientation);
         let bullet = &mut scene.graph[bullet];
+        println!("spawn bullet. seed.range: {}, seed.initial_velocity: {}", seed.range, seed.initial_velocity);
+        bullet.add_script(Bullet::default());
         let bullet_script = bullet.try_get_script_mut::<Bullet>().unwrap();
-        bullet_script.params = BulletParams {
-            velocity: seed.direction.normalize() * seed.initial_velocity,
-            remaining_sec: seed.range / seed.initial_velocity,
-            author_collider: seed.author_collider,
-        };
+        bullet_script.velocity = seed.direction.normalize() * seed.initial_velocity;
+        bullet_script.remaining_sec = seed.range / seed.initial_velocity;
+        bullet_script.author_collider = seed.author_collider;
     }
 }
 
@@ -59,18 +54,21 @@ pub struct BulletHit {}
 impl ScriptTrait for Bullet {
     fn on_update(&mut self, ctx: &mut ScriptContext) {
         profiling::scope!("Bullet::on_update");
-        self.params.remaining_sec -= ctx.dt;
-        if self.params.remaining_sec <= 0.0 {
+        println!("remaining_sec: {}", self.remaining_sec);
+        self.remaining_sec -= ctx.dt;
+        println!("remaining_sec (after dt): {}", self.remaining_sec);
+        if self.remaining_sec <= 0.0 {
+            println!("bullet expired");
             ctx.scene.graph.remove_node(ctx.handle);
             return;
         }
         let t = ctx.scene.graph[ctx.handle].local_transform_mut();
-        let new_pos = t.position().add(self.params.velocity * ctx.dt);
+        let new_pos = t.position().add(self.velocity * ctx.dt);
 
         let opts = RayCastOptions {
             ray_origin: Point3::from(*t.position().get_value_ref()),
-            ray_direction: self.params.velocity.normalize(),
-            max_len: self.params.velocity.magnitude() * ctx.dt,
+            ray_direction: self.velocity.normalize(),
+            max_len: self.velocity.magnitude() * ctx.dt,
             groups: Default::default(),
             sort_results: true,
         };
@@ -81,7 +79,7 @@ impl ScriptTrait for Bullet {
         }
 
         for hit in results {
-            if hit.collider == self.params.author_collider {
+            if hit.collider == self.author_collider {
                 continue;
             }
             ctx.message_sender

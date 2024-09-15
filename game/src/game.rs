@@ -8,6 +8,7 @@ use fyrox::{
     core::{
         algebra::Vector3, pool::Handle, reflect::prelude::*, visitor::prelude::*, TypeUuidProvider,
     },
+    graph::SceneGraph,
     gui::{message::MessageDirection, text::TextMessage, UiNode},
     plugin::{PluginContext, PluginRegistrationContext},
     scene::node::Node,
@@ -41,11 +42,15 @@ impl Plugin for Game {
         context
             .async_scene_loader
             .request(scene_path.unwrap_or("data/scene.rgs"));
+        context.async_scene_loader.request("data/hud.ui");
 
-        self.hud =
-            TextBuilder::new(WidgetBuilder::new().with_foreground(Brush::Solid(Color::BLACK)))
-                .with_font_size(40.0)
-                .build(&mut context.user_interfaces.first_mut().build_ctx());
+        self.hud = context
+            .user_interfaces
+            .first_mut()
+            .find_handle_by_name_from_root("HUD");
+        TextBuilder::new(WidgetBuilder::new().with_foreground(Brush::Solid(Color::BLACK)))
+            .with_font_size(40.0)
+            .build(&mut context.user_interfaces.first_mut().build_ctx());
     }
 
     fn update(&mut self, #[allow(unused_variables)] context: &mut PluginContext) {

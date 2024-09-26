@@ -14,3 +14,5 @@ cargo run -p executor
 
 # How to play
 Use WASD and mouse to shoot enemies and optionally avoid their attacks.
+
+![gameplay.png](gameplay.png)
